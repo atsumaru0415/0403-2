@@ -99,6 +99,26 @@ if uploaded_file:
         csv_bid = top_bid.sort_values(by='RecommendedBid', ascending=False).to_csv(index=False).encode('utf-8')
         st.download_button("📥 推奨入札額をCSVでダウンロード", data=csv_bid, file_name="recommended_bids.csv", mime='text/csv')
 
+        # --- AIによる広告診断レポート ---
+        st.subheader("🧠 AI診断レポート：広告の問題点と改善提案")
+        st.write("AIがあなたの広告データを分析し、改善点とレコメンドを提示します。")
+
+        if st.button("📋 レポートを生成"):
+            diagnostic_msgs = []
+            for _, row in df.iterrows():
+                if row['Spend'] > 1000 and row['Sales'] == 0:
+                    diagnostic_msgs.append(f"❌ '{row.get('Search Term', '（キーワード名不明）')}' は広告費が¥{int(row['Spend'])}かかっていますが売上がありません。除外を検討してください。")
+                if row['CTR'] < 0.01:
+                    diagnostic_msgs.append(f"⚠️ '{row.get('Search Term', '（キーワード名不明）')}' のクリック率は {row['CTR']:.2%} と非常に低く、関連性が薄い可能性があります。")
+                if row['CVR'] > 0.1 and row['RecommendedBid'] < 20:
+                    diagnostic_msgs.append(f"💡 '{row.get('Search Term', '（キーワード名不明）')}' はCVRが高い（{row['CVR']:.1%}）ですが、入札額が低めです。¥{int(row['RecommendedBid'])} 以上に設定することで売上向上が見込めます。")
+
+            if diagnostic_msgs:
+                for msg in diagnostic_msgs:
+                    st.markdown(msg)
+            else:
+                st.info("明確な改善提案が見つかりませんでした。全体的に健全なデータです！")
+
         # --- 高度AI機能：検索語句のクラスタリング ---
         st.subheader("🧠 検索語句のAIクラスタリング")
         if 'Search Term' in df.columns:
