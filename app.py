@@ -124,8 +124,14 @@ if uploaded_file:
 
         df_ml['AI_Predicted_Success'] = model.predict_proba(df_ml[ml_features])[:, 1]
 
-        st.dataframe(df_ml[['Search Term', 'Sales', 'Clicks', 'CVR', 'AI_Predicted_Success']]
-            .sort_values(by='AI_Predicted_Success', ascending=False).head(10))
+        expected_pred_cols = ['Search Term', 'Sales', 'Clicks', 'CVR', 'AI_Predicted_Success']
+        available_pred_cols = [col for col in expected_pred_cols if col in df_ml.columns]
+        st.dataframe(
+            df_ml[available_pred_cols].sort_values(
+                by='AI_Predicted_Success' if 'AI_Predicted_Success' in df_ml.columns else available_pred_cols[0],
+                ascending=False
+            ).head(10)
+        )
 
     else:
         st.error("このファイル形式は対応していないようです。検索語句レポートまたはターゲティングレポートをアップロードしてください。")
