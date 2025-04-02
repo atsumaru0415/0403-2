@@ -45,15 +45,18 @@ if uploaded_file:
         st.write("上位キーワード・ターゲティング")
 
         top_terms = df.sort_values(by='Sales', ascending=False).head(10)
-        st.dataframe(top_terms[['Search Term', 'Targeting', 'Impressions', 'Clicks', 'Sales', 'ACOS', 'ROAS']].dropna(axis=1, how='all'))
+        expected_cols = ['Search Term', 'Targeting', 'Impressions', 'Clicks', 'Sales', 'ACOS', 'ROAS']
+        available_cols = [col for col in expected_cols if col in top_terms.columns]
+        st.dataframe(top_terms[available_cols])
 
         st.subheader("売上 vs ACOS グラフ")
-        chart = alt.Chart(df).mark_circle(size=60).encode(
-            x='Sales',
-            y='ACOS',
-            tooltip=['Search Term', 'Sales', 'ACOS', 'ROAS']
-        ).interactive()
-        st.altair_chart(chart, use_container_width=True)
+        if 'ACOS' in df.columns:
+            chart = alt.Chart(df).mark_circle(size=60).encode(
+                x='Sales',
+                y='ACOS',
+                tooltip=['Search Term', 'Sales', 'ACOS', 'ROAS']
+            ).interactive()
+            st.altair_chart(chart, use_container_width=True)
 
         # --- 広告出稿レコメンド ---
         st.subheader("✨ 広告出稿レコメンド（オーガニックで反応あり）")
@@ -94,16 +97,17 @@ if uploaded_file:
 
         # --- 高度AI機能：検索語句のクラスタリング ---
         st.subheader("🧠 検索語句のAIクラスタリング")
-        text_data = df['Search Term'].fillna('')
-        vectorizer = TfidfVectorizer(max_features=100)
-        X = vectorizer.fit_transform(text_data)
+        if 'Search Term' in df.columns:
+            text_data = df['Search Term'].fillna('')
+            vectorizer = TfidfVectorizer(max_features=100)
+            X = vectorizer.fit_transform(text_data)
 
-        kmeans = KMeans(n_clusters=4, random_state=42)
-        df['Cluster'] = kmeans.fit_predict(X)
-        st.write("クラスタごとの代表的な検索語句：")
-        for i in range(4):
-            st.markdown(f"**クラスタ {i}**")
-            st.write(df[df['Cluster'] == i]['Search Term'].head(5).tolist())
+            kmeans = KMeans(n_clusters=4, random_state=42)
+            df['Cluster'] = kmeans.fit_predict(X)
+            st.write("クラスタごとの代表的な検索語句：")
+            for i in range(4):
+                st.markdown(f"**クラスタ {i}**")
+                st.write(df[df['Cluster'] == i]['Search Term'].head(5).tolist())
 
         # --- 高度AI機能：機械学習による売れる予測 ---
         st.subheader("🔍 機械学習による売れる検索語句の予測")
