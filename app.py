@@ -90,7 +90,9 @@ if uploaded_file:
         df['AvgOrderValue'] = df['Sales'] / df['Clicks']
         df['RecommendedBid'] = df['CVR'] * df['AvgOrderValue'] * target_acos
 
-        top_bid = df[['Search Term', 'Sales', 'Clicks', 'CVR', 'AvgOrderValue', 'RecommendedBid']]
+        expected_bid_cols = ['Search Term', 'Sales', 'Clicks', 'CVR', 'AvgOrderValue', 'RecommendedBid']
+        available_bid_cols = [col for col in expected_bid_cols if col in df.columns]
+        top_bid = df[available_bid_cols]
         st.dataframe(top_bid.sort_values(by='RecommendedBid', ascending=False).head(10))
 
         # CSVエクスポートボタン（入札提案）
