@@ -50,13 +50,15 @@ if uploaded_file:
         st.dataframe(top_terms[available_cols])
 
         st.subheader("売上 vs ACOS グラフ")
-        if 'ACOS' in df.columns:
+        if 'Sales' in df.columns and 'ACOS' in df.columns:
             chart = alt.Chart(df).mark_circle(size=60).encode(
                 x='Sales',
                 y='ACOS',
-                tooltip=['Search Term', 'Sales', 'ACOS', 'ROAS']
+                tooltip=[col for col in ['Search Term', 'Sales', 'ACOS', 'ROAS'] if col in df.columns]
             ).interactive()
             st.altair_chart(chart, use_container_width=True)
+        else:
+            st.info("Sales または ACOS カラムが見つからないため、グラフを表示できません。")
 
         # --- 広告出稿レコメンド ---
         st.subheader("✨ 広告出稿レコメンド（オーガニックで反応あり）")
