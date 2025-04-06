@@ -1,59 +1,83 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.cluster import KMeans
-from lightgbm import LGBMClassifier
-import io
 
-# タイトル
-st.title("Amazon広告分析ダッシュボード")
+# CSV or Excel ファイルアップロード
+df = pd.read_csv("your_data.csv")  # Excelの場合は pd.read_excel に変更
 
-# ファイルアップロード
-uploaded_file = st.file_uploader("Amazon広告レポート（検索語句 or ターゲティング）をアップロード", type=["xlsx"])
+st.set_page_config(page_title="広告分析ダッシュボード", layout="wide")
+st.title("📊 スポンサープロダクト広告分析ツール")
 
-if uploaded_file:
-    df = pd.read_excel(uploaded_file)
+# サイドバーでメニュー選択
+menu = st.sidebar.radio("表示する分析を選択", (
+    "キーワード別の成果一覧",
+    "キャンペーン全体の概要",
+    "日別推移の可視化",
+    "レコメンド機能"
+))
 
-    st.subheader("データのプレビュー")
-    st.dataframe(df.head())
+# 日付型に変換（必要な場合）
+df['Date'] = pd.to_datetime(df['Date'])
 
-    # 柔軟なカラム名対応
-    rename_dict = {
-        'インプレッション': 'Impressions',
-        'クリック数': 'Clicks',
-        'クリック': 'Clicks',
-        '広告費': 'Spend',
-        '費用': 'Spend',
-        '広告がクリックされてから7日間の総売上高': 'Sales',
-        '広告費売上高比率（ACOS）合計': 'ACOS',
-        '広告費用対効果（ROAS）合計': 'ROAS',
-        'カスタマーの検索キーワード': 'Search Term',
-        'ターゲティング': 'Targeting',
-        '開始日': 'Start Date',
-        '終了日': 'End Date'
-    }
-    df.rename(columns=rename_dict, inplace=True)
+if menu == "キーワード別の成果一覧":
+    st.header("🔍 キーワード別 成果一覧")
+    keyword_summary = df.groupby("Keyword").agg({
+        'Impressions': 'sum',
+        'Clicks': 'sum',
+        'Cost': 'sum',
+        'Sales': 'sum',
+        'ACOS': 'mean',
+        'ROAS': 'mean'
+    }).reset_index()
 
-    # 日付フィルターの追加
-    if 'Start Date' in df.columns and 'End Date' in df.columns:
-        df['Start Date'] = pd.to_datetime(df['Start Date'])
-        df['End Date'] = pd.to_datetime(df['End Date'])
-        st.subheader("📅 分析期間を指定")
-        start_date = st.date_input("開始日", value=df['Start Date'].min().date())
-        end_date = st.date_input("終了日", value=df['End Date'].max().date())
-        df = df[(df['Start Date'] >= pd.to_datetime(start_date)) & (df['End Date'] <= pd.to_datetime(end_date))]
+    keyword_summary = keyword_summary.sort_values("Sales", ascending=False)
+    st.dataframe(keyword_summary, use_container_width=True)
 
-    # 必要なカラムがあるか確認
-    required_cols = ['Impressions', 'Clicks', 'Spend', 'Sales']
-    if all(col in df.columns for col in required_cols):
+elif menu == "キャンペーン全体の概要":
+    st.header("📈 キャンペーン全体の概要")
 
-        # 以下、省略（既存の処理をこの filtered df に基づいて継続）
-        # ...（分析・診断・レコメンドなどの処理がここに続く）
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("インプレッション", f"{int(df['Impressions'].sum()):,}")
+    col2.metric("クリック数", f"{int(df['Clicks'].sum()):,}")
+    col3.metric("広告費", f"¥{df['Cost'].sum():,.0f}")
+    col4.metric("売上", f"¥{df['Sales'].sum():,.0f}")
 
-        st.success("選択した期間のデータに基づいて分析しました！")
+    chart = alt.Chart(df).mark_bar().encode(
+        x='Keyword:N',
+        y='Sales:Q',
+        tooltip=['Keyword', 'Sales']
+    ).properties(width=800, height=400).interactive()
 
+    st.altair_chart(chart)
+
+elif menu == "日別推移の可視化":
+    st.header("📆 日別推移")
+    daily = df.groupby("Date").agg({
+        'Impressions': 'sum',
+        'Clicks': 'sum',
+        'Cost': 'sum',
+        'Sales': 'sum',
+    }).reset_index()
+
+    st.line_chart(daily.set_index("Date"))
+
+elif menu == "レコメンド機能":
+    st.header("💡 改善アクション提案")
+
+    # 条件に応じたフィルタとコメント
+    bad_roas = df[(df['Cost'] > 0) & (df['ROAS'] < 1)]
+    no_sales = df[(df['Clicks'] > 5) & (df['Sales'] == 0)]
+
+    st.subheader("ROAS が低いキーワード")
+    if not bad_roas.empty:
+        st.dataframe(bad_roas[['Keyword', 'Cost', 'Sales', 'ROAS']], use_container_width=True)
+        st.info("ROAS が 1 未満のキーワードは費用に対して効果が出ていません。停止や調整を検討しましょう。")
     else:
-        st.error("このファイル形式は対応していないようです。検索語句レポートまたはターゲティングレポートをアップロードしてください。")
-else:
-    st.info("まずはExcelファイルをアップロードしてください。")
+        st.success("ROAS が 低いキーワードはありません。")
+
+    st.subheader("クリック多いが売れていないキーワード")
+    if not no_sales.empty:
+        st.dataframe(no_sales[['Keyword', 'Clicks', 'Sales']], use_container_width=True)
+        st.info("クリックは多いが売れていないキーワードがあります。訴求内容の見直しやキーワード除外を検討してください。")
+    else:
+        st.success("クリックはある程度あり、売上も発生しています。")
